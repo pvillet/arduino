@@ -48,15 +48,40 @@ boolean RecordOn = false;
 #define GREENBUTTON_W (FRAME_W/2)
 #define GREENBUTTON_H FRAME_H
 
-#define timeInterval 600000 // 10 min
+//#define timeInterval 600000 // 10 min
+#define timeInterval 60000 // 1min
 
 float Current_Temp = 20.00;
+float TempMoyenne = 0.00;
 char tbuffer[7];
 char line[7];
 unsigned long previousTime = 0;
 unsigned long currentTime;
 unsigned long BCK_ON_Time;
+unsigned int boucle = 0;
+#define INDEX 30
+float TableauTemperature[INDEX];
 
+
+void InitialiserTableau()
+{
+   for (int i=0; i < INDEX; i++) {
+      TableauTemperature[i] = -273.00;
+   }
+}
+
+void CalculerMoyenne()
+{
+  int id = 0;
+  float Somme = 0.00;
+   for (int i=0; i < INDEX; i++) {
+      if ( TableauTemperature[i] > -273.00) {
+         id++;
+         Somme = Somme + TableauTemperature[i];
+      }
+   }
+   TempMoyenne = Somme/id;
+}
 
 void EcrireDansFichier()
 {
@@ -66,10 +91,15 @@ void EcrireDansFichier()
 
   // if the file is available, write to it:
   if (dataFile) {
-    dataFile.println(Current_Temp);
+    dataFile.print(currentTime - previousTime);
+    dataFile.print(" ");
+    dataFile.println(TempMoyenne);
     dataFile.close();
     // print to the serial port too:
-    Serial.println(Current_Temp);
+    //Serial.print("Writing to SD card: ");
+    //Serial.print(currentTime - previousTime);
+    //Serial.print(" ");
+    //Serial.println(TempMoyenne);
   }
   // if the file isn't open, pop up an error:
   else {
@@ -113,49 +143,66 @@ void setup(void)
     return;
   }
   Serial.println(F("OK!"));
+  InitialiserTableau();
 }
 
 void loop()
 {
+ currentTime = millis();
 
  if (ts.touched()) {
    digitalWrite(EN_BACKLIGHT, HIGH);
    BCK_ON_Time = millis();
  }
 
-if (millis() - BCK_ON_Time > 10000 ) {
+ if (millis() - BCK_ON_Time > 10000 ) {
    digitalWrite(EN_BACKLIGHT, LOW);   
-}
+ }
 
-currentTime = millis();
-if ( (currentTime - previousTime > timeInterval) || (previousTime == 0) ) {
-   previousTime = currentTime;
+// if ( (currentTime - previousTime > timeInterval) || (previousTime == 0) ) {
+  //Serial.print("boucle: ");  
+  //Serial.println(boucle);  
+  if (boucle == (INDEX-1))
+     boucle = 0;
+  else 
+     boucle++;
+   
   // call sensors.requestTemperatures() to issue a global temperature 
   // request to all devices on the bus
   // Serial.print("Requesting temperatures...");
    sensors.requestTemperatures(); // Send the command to get temperatures
-   Serial.println("DONE");
+   //Serial.println("DONE");
   // After we got the temperatures, we can print them here.
   // We use the function ByIndex, and as an example get the temperature from the first sensor only.
   //Serial.print("Temperature for the device 1 (index 0) is: ");
   Current_Temp = sensors.getTempCByIndex(0);
   //Serial.println(Current_Temp);  
 
-  if (Current_Temp < 80) { // To remoe read temp error
-  dtostrf(Current_Temp,4,2,tbuffer);
+  if (Current_Temp > -127 && Current_Temp < 80) { // To remove read temp error
+  TableauTemperature[boucle] = Current_Temp;
+  CalculerMoyenne();
+  //Serial.print("Temperature moyenne: ");  
+  //Serial.println(TempMoyenne);  
+  dtostrf(TempMoyenne,4,2,tbuffer);
   sprintf(line, "%s C", tbuffer);
-  EcrireDansFichier();
   tft.setCursor(10 , 100);
   tft.setTextColor(ILI9341_WHITE);
   tft.setTextSize(7);
   tft.fillScreen(ILI9341_BLACK);
   tft.println(line);
 
-  delay(10000); //10 sec
-  digitalWrite(EN_BACKLIGHT, LOW);
+  }
+ //}
+ 
+ // On ecrit dans la SD card seulement toute les 1 min
+if ( (currentTime - previousTime > timeInterval) || (previousTime == 0) ) {
+   EcrireDansFichier();
+   previousTime = currentTime;
   }
 
-}
+  delay(5000); //5 sec
+  digitalWrite(EN_BACKLIGHT, LOW);
+
   
 //delay(10000);
 }
