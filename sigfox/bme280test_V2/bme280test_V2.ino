@@ -76,7 +76,7 @@ void setup() {
     
   if (oneshot == true) {
     Serial1.begin(115200);
-    while (!Serial1) {};
+    while (!Serial) {};
   }
 
   if (oneshot == true) {
@@ -99,9 +99,9 @@ void setup() {
   }
   // Enable debug led and disable automatic deep sleep
   // Comment this line when shipping your project :)
-    if (oneshot == true) {
+  //  if (oneshot == true) {
       SigFox.debug();
-    }
+  //  }
 
   String version = SigFox.SigVersion();
   String ID = SigFox.ID();
@@ -132,7 +132,8 @@ void setup() {
 
   // To monitor if 5V is present or not
   pinMode(2, INPUT);
-
+  //pinMode(2, INPUT_PULLUP);
+  //LowPower.attachInterruptWakeup(2, alarmEvent2, CHANGE);
   LowPower.attachInterruptWakeup(RTC_ALARM_WAKEUP, alarmEvent0, CHANGE);
 
    // weather monitoring
@@ -206,8 +207,16 @@ void loop() {
   SigFox.endPacket();
   SigFox.end();
 
-    
-  LowPower.sleep(delayTime);
+  // 15*60*1000 = 15 minutes
+  for (int lp = 0; lp < 156; lp++) { 
+     LowPower.sleep(10000);
+     if (Is_5V != digitalRead(2)) {
+      //Input Power has changed, send a message
+      break;
+     }
+  }
+
+  //LowPower.sleep(delayTime);
   //delay(delayTime);
 }
 
@@ -246,4 +255,14 @@ void printValues() {
 
 void alarmEvent0() {
  volatile int alarm_source = 0;
+    if (oneshot == true) {
+    Serial1.println("-- alarmEvent0 --");
+   }
+}
+   
+ void alarmEvent2() {
+  volatile int alarm_source2 = 0;
+    if (oneshot == true) {
+    Serial1.println("-- alarmEvent2 --");
+   }
 }
